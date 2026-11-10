@@ -13,13 +13,17 @@ public class RollBall : MonoBehaviour
     bool roll;
     public Transform[] pins;
     public TMP_Text scoreText;
+    
+    bool[] countedPins;
+    bool isRolling;
 
     Vector3[] startPositions;
     Quaternion[] startRotations;
     int score;
     Vector3 startPosition;
 
-    public float rollPower = 1000f;
+    public float rollPower = 20f;
+    private float holdTime = 0f;
 
     void Start()
     {
@@ -31,6 +35,7 @@ public class RollBall : MonoBehaviour
 
         startPositions = new Vector3[pins.Length];
         startRotations = new Quaternion[pins.Length];
+        countedPins = new bool[pins.Length];
 
         for (int pinNumber = 0; pinNumber < pins.Length; pinNumber++)
         {
@@ -43,9 +48,14 @@ public class RollBall : MonoBehaviour
 
     void Update()
     {
+        if (isRolling == true)
+        {
+            return;
+        }
         if (bowlButt.WasPressedThisFrame())
         {
             holdingButt = true;
+            holdTime = 0;
             //StartRoll();
         }
         else if (bowlButt.WasReleasedThisFrame())
@@ -53,7 +63,10 @@ public class RollBall : MonoBehaviour
             holdingButt = false;
             roll = true;
         }
-
+        if (holdingButt == true)
+        {
+            holdTime += Time.deltaTime;
+        }
         //Debug.Log(CallculateGrade(20, -10));
     }
 
@@ -70,13 +83,29 @@ public class RollBall : MonoBehaviour
             StartRoll();
             //roll the ball based on the mouse's direction
         }
+        
+        if (isRolling)
+        {
+            for (int pinNumber = 0; pinNumber < pins.Length; pinNumber++)
+            {
+                if (!countedPins[pinNumber] && Quaternion.Angle(startRotations[pinNumber], pins[pinNumber].rotation) > 60f)
+                {
+                    score++;
+                    countedPins[pinNumber] = true;
+                    scoreText.text = "Score: " + score;
+                }
+            }
+        }
+
     }
 
     void StartRoll()
     {
         Vector3 pointTo = FindDirection();
-        rigidBody.AddForce(rollPower * pointTo, ForceMode.Impulse);
+        rigidBody.AddForce(Mathf.Clamp(rollPower + holdTime * 40f, 70f, 160f) * pointTo, ForceMode.Impulse);
+        
         roll = false;
+        isRolling = true;
     }
 
     Vector3 FindDirection()
@@ -90,9 +119,9 @@ public class RollBall : MonoBehaviour
     {
         if (other.CompareTag("Gutter"))
             {
-            transform.position = startPosition;
-            rigidBody.linearVelocity = Vector3.zero;
-            rigidBody.angularVelocity = Vector3.zero;
+                {
+                    Invoke("ResetBall", 1f);
+                }
         }
     }
 
@@ -108,6 +137,7 @@ public class RollBall : MonoBehaviour
     }
 
 
+    
     void ResetBall()
     {
         rigidBody.linearVelocity = Vector3.zero;
@@ -116,11 +146,6 @@ public class RollBall : MonoBehaviour
 
         for (int pinNumber = 0; pinNumber < pins.Length; pinNumber++)
         {
-            if (pins[pinNumber].up.y < 0.7f)
-            {
-                score++;
-            }
-
             Rigidbody pinBody = pins[pinNumber].GetComponent<Rigidbody>();
 
             pinBody.linearVelocity = Vector3.zero;
@@ -128,10 +153,13 @@ public class RollBall : MonoBehaviour
 
             pins[pinNumber].position = startPositions[pinNumber];
             pins[pinNumber].rotation = startRotations[pinNumber];
+
+            countedPins[pinNumber] = false;
         }
 
-        scoreText.text = "Score: " + score;
+        isRolling = false;
     }
+
 
 
     int CallculateGrade(int a, int b)
